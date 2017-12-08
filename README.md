@@ -10,7 +10,7 @@ Exemple use :
 Downloading a single table from netezza, to local folder `/tmp/your/directory/here`:
 
  ```
- java -jar jdbc-to-orc-1.0.0-SNAPSHOT.jar \
+ java -jar jdbc-to-orc-1.0.0-alpha.jar \
  --jdbc-url=jdbc:netezza://HOST:PORT/SCHEMA \
  --jdbc-login=YOUR_DB_ACCOUNT \
  --jdbc-password=YOUR_PASSWORD_HERE \
@@ -19,10 +19,21 @@ Downloading a single table from netezza, to local folder `/tmp/your/directory/he
  --table=YOUR_TABLE_HERE
  ```
  
+ Downloading all tables for a given schema from MS Sql Server:
+
+ ```
+ java -jar jdbc-to-orc-1.0.0-alpha.jar \
+ --jdbc-url=jdbc:microsoft:sqlserver://HOST:1433;DatabaseName=DATABASE \
+ --jdbc-login=YOUR_DB_ACCOUNT \
+ --jdbc-password=YOUR_PASSWORD_HERE \
+ --jdbc-driver=com.microsoft.jdbc.sqlserver.SQLServerDriver \
+ --output-dir=/tmp/your/directory/here \
+ --schema=YOUR_SCHEMA_HERE
+ ``` 
  Downloading all tables for a given schema from Oracle:
 
  ```
- java -jar jdbc-to-orc-1.0.0-SNAPSHOT.jar \
+ java -jar jdbc-to-orc-1.0.0-alpha.jar \
  --jdbc-url=jdbc:oracle:thin:@HOST:1521/SERVICENAME \
  --jdbc-login=YOUR_DB_ACCOUNT \
  --jdbc-password=YOUR_PASSWORD_HERE \
@@ -30,3 +41,5 @@ Downloading a single table from netezza, to local folder `/tmp/your/directory/he
  --output-dir=/tmp/your/directory/here \
  --schema=YOUR_SCHEMA_HERE
  ```
+ 
+ 
