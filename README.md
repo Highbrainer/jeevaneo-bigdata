@@ -28,5 +28,5 @@ Downloading a single table from netezza, to local folder `/tmp/your/directory/he
  --jdbc-password=YOUR_PASSWORD_HERE \
  --jdbc-driver=oracle.jdbc.OracleDriver \
  --output-dir=/tmp/your/directory/here \
- --schema=YOUR_SCHEMA_HERE \
+ --schema=YOUR_SCHEMA_HERE
  ```
