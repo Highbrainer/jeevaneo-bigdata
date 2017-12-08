@@ -11,11 +11,11 @@ Downloading a single table from netezza, to local folder `/tmp/your/directory/he
 
  ```
  java -jar jdbc-to-orc-1.0.0-SNAPSHOT.jar \
- --jdbc-url=jdbc:netezza://HOST:PORT/SCHEMA
- --jdbc-login=YOUR_DB_ACCOUNT
- --jdbc-password=YOUR_PASSWORD_HERE
- --jdbc-driver=org.netezza.Driver
- --output-dir=/tmp/your/directory/here
+ --jdbc-url=jdbc:netezza://HOST:PORT/SCHEMA \
+ --jdbc-login=YOUR_DB_ACCOUNT \
+ --jdbc-password=YOUR_PASSWORD_HERE \
+ --jdbc-driver=org.netezza.Driver \
+ --output-dir=/tmp/your/directory/here \
  --table=YOUR_TABLE_HERE
  ```
  
@@ -23,10 +23,10 @@ Downloading a single table from netezza, to local folder `/tmp/your/directory/he
 
  ```
  java -jar jdbc-to-orc-1.0.0-SNAPSHOT.jar \
- --jdbc-url=jdbc:oracle:thin:@HOST:1521/SERVICENAME
- --jdbc-login=YOUR_DB_ACCOUNT
- --jdbc-password=YOUR_PASSWORD_HERE
- --jdbc-driver=oracle.jdbc.OracleDriver
- --output-dir=/tmp/your/directory/here
- --schema=YOUR_SCHEMA_HERE
+ --jdbc-url=jdbc:oracle:thin:@HOST:1521/SERVICENAME \
+ --jdbc-login=YOUR_DB_ACCOUNT \
+ --jdbc-password=YOUR_PASSWORD_HERE \
+ --jdbc-driver=oracle.jdbc.OracleDriver \
+ --output-dir=/tmp/your/directory/here \
+ --schema=YOUR_SCHEMA_HERE \
  ```
