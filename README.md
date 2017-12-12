@@ -26,7 +26,7 @@ Downloading a single table from netezza, to local folder `/tmp/your/directory/he
  --jdbc-url=jdbc:microsoft:sqlserver://HOST:1433;DatabaseName=DATABASE \
  --jdbc-login=YOUR_DB_ACCOUNT \
  --jdbc-password=YOUR_PASSWORD_HERE \
- --jdbc-driver=com.microsoft.jdbc.sqlserver.SQLServerDriver \
+ --jdbc-driver=com.microsoft.sqlserver.jdbc.SQLServerDriver \
  --output-dir=/tmp/your/directory/here \
  --schema=YOUR_SCHEMA_HERE
  ``` 
