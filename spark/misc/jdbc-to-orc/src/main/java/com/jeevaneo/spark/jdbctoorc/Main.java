@@ -12,6 +12,8 @@ import java.sql.SQLException;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.apache.spark.sql.Dataset;
@@ -41,6 +43,10 @@ public class Main {
 	private String driver;
 
 	private String dir;
+
+	private boolean exporting = true;
+	private Long limit = null;
+	private int parallelism = 1; // no parallelism!
 
 	public Main(String jdbcUrl, String jdbcLogin, String jdbcPassword, String driver, String dir) {
 		super();
@@ -82,12 +88,18 @@ public class Main {
 		String schema = params.os("schema");
 		String dir = params.ms("output-dir");
 		String driver = params.os("jdbc-driver", OracleDriver.class.getName());
+		boolean exporting = params.ob("export", true);
+		Long limit = params.ol("limit");
+		int parallelism = params.oi("parallelism", 1);
 
 		if (null == table && null == schema) {
 			throw new IllegalArgumentException("At least one of table or schema is needed.");
 		}
 
 		Main moi = new Main(jdbcUrl, jdbcLogin, jdbcPassword, driver, dir);
+		moi.setExporting(exporting);
+		moi.setLimit(limit);
+		moi.setParallelism(parallelism);
 
 		if (null != table) {
 			if (null != schema) {
@@ -137,13 +149,26 @@ public class Main {
 
 	private void exportAll(String schema) throws SQLException {
 		workInSpark(ss -> {
-			listTables(schema).stream().limit(10).peek(System.out::println).forEach(t -> exportTable(ss, t));
+			ForkJoinPool threadPool = new ForkJoinPool(getParallelism());
+			threadPool.submit(() -> {
+				try {
+					listTables(schema).parallelStream().forEach(t -> exportTable(ss, t));
+				} catch (SQLException e) {
+					throw new RuntimeException(e);
+				}
+			});
+			threadPool.shutdown();
+			try {
+				threadPool.awaitTermination(2, TimeUnit.DAYS);
+			} catch (InterruptedException e) {
+				throw new RuntimeException(e);
+			}
 		});
 	}
 
 	private void exportTable(SparkSession ss, String table) {
 
-		boolean exporting = true;
+		log.info("Exporting " + table + "...");
 
 		Properties props = new Properties();
 		props.put("user", jdbcLogin);
@@ -154,9 +179,18 @@ public class Main {
 		File file = new File(dir, table);
 		file.getParentFile().mkdirs();
 		String path = file.toURI().toString();
-		if (exporting) {
+		if (isExporting()) {
 
-			Dataset<Row> df = ss.read().jdbc(jdbcUrl, table, props);
+			String sql = table;
+			if (null != limit) {
+				if (driver.equalsIgnoreCase(OracleDriver.class.getName())) {
+					sql = "(select * from " + table + " where rownum < " + limit + ") src";
+				} else {
+					sql = "(select * from " + table + " limit " + limit + ") src";
+				}
+			}
+			Dataset<Row> df = ss.read().jdbc(jdbcUrl, sql /* , new String[] { "1=2" } */, props);
+			// df.printSchema();
 			// log.debug("Table " + table + " : " + df.count() + " lignes.");
 
 			df.write().mode(SaveMode.Overwrite).orc(path);
@@ -185,6 +219,30 @@ public class Main {
 			long end = System.currentTimeMillis();
 			log.info("Done in " + (end - start) + " ms.");
 		}
+	}
+
+	public boolean isExporting() {
+		return exporting;
+	}
+
+	public void setExporting(boolean exporting) {
+		this.exporting = exporting;
+	}
+
+	public Long getLimit() {
+		return limit;
+	}
+
+	public void setLimit(Long limit) {
+		this.limit = limit;
+	}
+
+	public int getParallelism() {
+		return parallelism;
+	}
+
+	public void setParallelism(int parallelism) {
+		this.parallelism = parallelism;
 	}
 }
 
