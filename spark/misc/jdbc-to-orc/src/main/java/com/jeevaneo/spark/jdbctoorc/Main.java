@@ -102,10 +102,14 @@ public class Main {
 		moi.setParallelism(parallelism);
 
 		if (null != table) {
-			if (null != schema) {
-				table = schema + "." + table;
+
+			String[] tables = table.split(",");
+			for (String t : tables) {
+				if (null != schema) {
+					t = schema + "." + t;
+				}
+				moi.exportTable(t);
 			}
-			moi.exportTable(table);
 		} else if (null != schema) {
 			moi.exportAll(schema);
 		}
