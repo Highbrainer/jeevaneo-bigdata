@@ -106,7 +106,7 @@ public class Main {
 			String[] tables = table.split(",");
 			for (String t : tables) {
 				if (null != schema) {
-					t = schema + "." + t;
+					t = schema + "." + t.trim();
 				}
 				moi.exportTable(t);
 			}
