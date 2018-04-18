@@ -6,14 +6,20 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.apache.log4j.Logger;
 import org.apache.spark.sql.Dataset;
@@ -23,6 +29,7 @@ import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.SparkSession.Builder;
 
 import com.jeevaneo.util.Args;
+import com.jeevaneo.util.OS;
 
 import oracle.jdbc.OracleDriver;
 
@@ -41,6 +48,11 @@ public class Main {
 	private String jdbcLogin;
 	private String jdbcPassword;
 	private String driver;
+	private boolean exportingTables = true;
+	private boolean exportingViews = false;
+	private boolean exportingSynonyms = false;
+
+	private List<String> tableBlackList = new LinkedList<>();
 
 	private String dir;
 
@@ -55,18 +67,28 @@ public class Main {
 		this.jdbcPassword = jdbcPassword;
 		this.driver = driver;
 		this.dir = dir;
+
+		try {
+			Class.forName(driver);
+		} catch (ClassNotFoundException e) {
+			throw new IllegalArgumentException("Driver not found - missing jar on the classpath? " + driver, e);
+		}
 	}
 
 	static {
 		if (System.getProperty("hadoop.home.dir") == null) {
+			System.setProperty("hadoop.home.dir", HADOOP_HOME.getAbsolutePath());
+			System.setProperty("hadoop.conf.dir", HADOOP_CONF.getAbsolutePath());
+			System.setProperty("hadoop.bin.dir", HADOOP_BIN.getAbsolutePath());
 			try {
 
-				HADOOP_BIN.mkdirs();
-				File targetFile = new File(HADOOP_BIN, "winutils.exe");
-				Files.copy(Main.class.getResourceAsStream("/winutils.exe"), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-				System.setProperty("hadoop.home.dir", HADOOP_HOME.getAbsolutePath());
-				System.setProperty("hadoop.conf.dir", HADOOP_CONF.getAbsolutePath());
-				System.setProperty("hadoop.bin.dir", HADOOP_BIN.getAbsolutePath());
+				if (OS.INSTANCE.isWindows()) {
+					File targetFile = new File(HADOOP_BIN, "winutils.exe");
+					if (!targetFile.exists()) {
+						HADOOP_BIN.mkdirs();
+						Files.copy(Main.class.getResourceAsStream("/winutils.exe"), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+					}
+				}
 
 				// File tmpHive = new File("/tmp/hive");
 				// tmpHive.mkdirs();
@@ -88,22 +110,18 @@ public class Main {
 		String schema = params.os("schema");
 		String dir = params.ms("output-dir");
 		String driver = params.os("jdbc-driver", OracleDriver.class.getName());
-		boolean exporting = params.ob("export", true);
-		Long limit = params.ol("limit");
-		int parallelism = params.oi("parallelism", 1);
 
 		if (null == table && null == schema) {
 			throw new IllegalArgumentException("At least one of table or schema is needed.");
 		}
 
 		Main moi = new Main(jdbcUrl, jdbcLogin, jdbcPassword, driver, dir);
-		moi.setExporting(exporting);
-		moi.setLimit(limit);
-		moi.setParallelism(parallelism);
+		params.populate(moi);
 
 		if (null != table) {
 
 			String[] tables = table.split(",");
+			log.info("Loading " + tables.length + " tables...");
 			for (String t : tables) {
 				if (null != schema) {
 					t = schema + "." + t.trim();
@@ -126,16 +144,42 @@ public class Main {
 		Set<String> tables = new TreeSet<>();
 		try (Connection con = connect();) {
 			DatabaseMetaData md = con.getMetaData();
-			try (ResultSet rs = md.getTables(null, schema, null, new String[] { "TABLE", "VIEW"/* , "SYNONYM" */ });) {
+
+			List<String> types = new ArrayList<>(3);
+			if (isExportingSynonyms()) {
+				types.add("SYNONYM");
+			}
+			if (isExportingTables()) {
+				types.add("TABLE");
+			}
+			if (isExportingViews()) {
+				types.add("VIEW");
+			}
+
+			try (ResultSet rs = md.getTables(null, schema, null, types.toArray(new String[types.size()]));) {
 				while (rs.next()) {
 					String tablename = rs.getString("TABLE_NAME");
 					log.debug(tablename);
-					tables.add(tablename);
+					if (!isTableBlackListed(tablename)) {
+						tables.add(tablename);
+					}
 				}
 				rs.close();
 			}
 		}
 		return tables;
+	}
+
+	private boolean isTableBlackListed(String tablename) {
+		if (null == tableBlackList) {
+			return false;
+		}
+		return tableBlackList.stream().map(this::regexpify).anyMatch(tablename::matches);
+	}
+
+	private String regexpify(String in) {
+		// TODO should protect litetals with Pattern.quote()...
+		return in.replaceAll("([\\*\\?])", ".$1");
 	}
 
 	private Connection connect() throws SQLException {
@@ -145,8 +189,9 @@ public class Main {
 
 	private void registerDriver() {
 		try {
-			Class.forName(driver);
-		} catch (ClassNotFoundException e) {
+			Class<?> clazz = Class.forName(driver);
+			DriverManager.registerDriver((Driver) clazz.newInstance());
+		} catch (ClassNotFoundException | InstantiationException | IllegalAccessException | SQLException e) {
 			throw new IllegalArgumentException("Driver JDBC introuvable : '" + driver + "'", e);
 		}
 	}
@@ -177,6 +222,7 @@ public class Main {
 		Properties props = new Properties();
 		props.put("user", jdbcLogin);
 		props.put("password", jdbcPassword);
+		props.put("driver", driver);
 
 		registerDriver();
 
@@ -247,6 +293,38 @@ public class Main {
 
 	public void setParallelism(int parallelism) {
 		this.parallelism = parallelism;
+	}
+
+	public boolean isExportingTables() {
+		return exportingTables;
+	}
+
+	public void setExportingTables(boolean exportingTables) {
+		this.exportingTables = exportingTables;
+	}
+
+	public boolean isExportingViews() {
+		return exportingViews;
+	}
+
+	public void setExportingViews(boolean exportingViews) {
+		this.exportingViews = exportingViews;
+	}
+
+	public boolean isExportingSynonyms() {
+		return exportingSynonyms;
+	}
+
+	public void setExportingSynonyms(boolean exportingSynonyms) {
+		this.exportingSynonyms = exportingSynonyms;
+	}
+
+	public List<String> getTableBlackList() {
+		return tableBlackList;
+	}
+
+	public void setTableBlackList(String tableBlackList) {
+		this.tableBlackList = Arrays.stream(tableBlackList.split(",")).collect(Collectors.toList());
 	}
 }
 
