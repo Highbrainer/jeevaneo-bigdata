@@ -167,6 +167,7 @@ public class Main {
 				rs.close();
 			}
 		}
+		log.info("Exporting " + tables.size() + " tables...");
 		return tables;
 	}
 
