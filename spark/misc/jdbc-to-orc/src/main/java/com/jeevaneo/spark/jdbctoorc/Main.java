@@ -52,6 +52,7 @@ public class Main {
 	private String compression = "snappy"; //none, snappy, zlib
 
 	private List<String> tableBlackList = new LinkedList<>();
+	private List<String> schemaBlackList = new LinkedList<String>() {{add("information_schema");}};
 
 	private String dir;
 
@@ -110,10 +111,6 @@ public class Main {
 		String dir = params.ms("output-dir");
 		String driver = params.ms("jdbc-driver");
 
-		if (null == table && null == schema) {
-			throw new IllegalArgumentException("At least one of table or schema is needed.");
-		}
-
 		Main moi = new Main(jdbcUrl, jdbcLogin, jdbcPassword, driver, dir);
 		params.populate(moi);
 
@@ -129,6 +126,8 @@ public class Main {
 			}
 		} else if (null != schema) {
 			moi.exportAll(schema);
+		} else {
+			moi.exportAll();
 		}
 
 	}
@@ -137,6 +136,42 @@ public class Main {
 		workInSpark(ss -> {
 			exportTable(ss, table);
 		});
+	}
+
+	private Set<String> listTables() throws SQLException {
+		Set<String> tables = new TreeSet<>();
+		try (Connection con = connect();) {
+			DatabaseMetaData md = con.getMetaData();
+			
+			List<String> types = new ArrayList<>(3);
+			if (isExportingSynonyms()) {
+				types.add("SYNONYM");
+			}
+			if (isExportingTables()) {
+				types.add("TABLE");
+			}
+			if (isExportingViews()) {
+				types.add("VIEW");
+			}
+			String[] aTypes = types.toArray(new String[types.size()]);
+			
+			try (ResultSet rs = md.getTables(con.getCatalog(), null, "%", aTypes);) {
+				while (rs.next()) {
+					String name = rs.getString("TABLE_NAME");
+					String schem = rs.getString("TABLE_SCHEM");
+					log.debug(name);
+					if (!isSchemaBlackListed(name)) {
+						if(null!=schem && !schem.trim().isEmpty()) {
+							name = schem + "." + name;
+						}
+						tables.add(name);
+					}
+				}
+				rs.close();
+			}
+		}
+		log.info("Exporting " + tables.size() + " tables...");
+		return tables;
 	}
 
 	private Set<String> listTables(String schema) throws SQLException {
@@ -154,8 +189,9 @@ public class Main {
 			if (isExportingViews()) {
 				types.add("VIEW");
 			}
-
-			try (ResultSet rs = md.getTables(null, schema, null, types.toArray(new String[types.size()]));) {
+			String[] aTypes = types.toArray(new String[types.size()]);
+			
+			try (ResultSet rs = md.getTables(null, schema, null, aTypes);) {
 				while (rs.next()) {
 					String tablename = rs.getString("TABLE_NAME");
 					log.debug(tablename);
@@ -175,6 +211,13 @@ public class Main {
 			return false;
 		}
 		return tableBlackList.stream().map(this::regexpify).anyMatch(tablename::matches);
+	}
+
+	private boolean isSchemaBlackListed(String name) {
+		if (null == schemaBlackList) {
+			return false;
+		}
+		return schemaBlackList.stream().map(this::regexpify).anyMatch(name::matches);
 	}
 
 	private String regexpify(String in) {
@@ -197,11 +240,40 @@ public class Main {
 	}
 
 	private void exportAll(String schema) throws SQLException {
+		
+		configureParallelism();
+		
 		workInSpark(ss -> {
 			ForkJoinPool threadPool = new ForkJoinPool(getParallelism());
 			threadPool.submit(() -> {
 				try {
 					listTables(schema).parallelStream().forEach(t -> exportTable(ss, t));
+				} catch (SQLException e) {
+					throw new RuntimeException(e);
+				}
+			});
+			threadPool.shutdown();
+			try {
+				threadPool.awaitTermination(2, TimeUnit.DAYS);
+			} catch (InterruptedException e) {
+				throw new RuntimeException(e);
+			}
+		});
+	}
+
+	private void configureParallelism() {
+		String threads = System.getProperty("java.util.concurrent.ForkJoinPool.common.parallelism", "-1");
+		if(Integer.parseInt(threads)<parallelism) {
+			System.setProperty("java.util.concurrent.ForkJoinPool.common.parallelism", ""+parallelism);
+		}
+	}
+	private void exportAll() throws SQLException {
+		configureParallelism();
+		workInSpark(ss -> {
+			ForkJoinPool threadPool = new ForkJoinPool(getParallelism());
+			threadPool.submit(() -> {
+				try {
+					listTables().parallelStream().forEach(t -> exportTable(ss, t));
 				} catch (SQLException e) {
 					throw new RuntimeException(e);
 				}
@@ -239,12 +311,16 @@ public class Main {
 					sql = "(select * from " + table + " limit " + limit + ") src";
 				}
 			}
-			Dataset<Row> df = ss.read().jdbc(jdbcUrl, sql /* , new String[] { "1=2" } */, props);
+			try {
+				Dataset<Row> df = ss.read().jdbc(jdbcUrl, sql /* , new String[] { "1=2" } */, props);
+				df.write().mode(SaveMode.Overwrite).option("orc.compress", getCompression()).orc(path);
+				log.info("Table " + table + " exportée vers " + file.getAbsolutePath());
+			} catch (Throwable e) {
+				e.printStackTrace();
+			}
 			// df.printSchema();
 			// log.debug("Table " + table + " : " + df.count() + " lignes.");
 
-			df.write().mode(SaveMode.Overwrite).option("orc.compress", getCompression()).orc(path);
-			log.info("Table " + table + " exportée vers " + file.getAbsolutePath());
 		} else {
 			ss.read().orc(path).printSchema();
 			System.out.println(ss.read().orc(path).count());
@@ -325,6 +401,14 @@ public class Main {
 
 	public void setTableBlackList(String tableBlackList) {
 		this.tableBlackList = Arrays.stream(tableBlackList.split(",")).collect(Collectors.toList());
+	}
+
+	public List<String> getSchemaBlackList() {
+		return schemaBlackList;
+	}
+
+	public void setSchelaBlackList(String schemaBlackList) {
+		this.schemaBlackList = Arrays.stream(schemaBlackList.split(",")).collect(Collectors.toList());
 	}
 
 	public String getCompression() {
