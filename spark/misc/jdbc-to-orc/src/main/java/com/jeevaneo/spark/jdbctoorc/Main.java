@@ -31,8 +31,6 @@ import org.apache.spark.sql.SparkSession.Builder;
 import com.jeevaneo.util.Args;
 import com.jeevaneo.util.OS;
 
-import oracle.jdbc.OracleDriver;
-
 public class Main {
 
 	private static Logger log = Logger.getLogger(Main.class);
@@ -51,6 +49,7 @@ public class Main {
 	private boolean exportingTables = true;
 	private boolean exportingViews = false;
 	private boolean exportingSynonyms = false;
+	private String compression = "snappy"; //none, snappy, zlib
 
 	private List<String> tableBlackList = new LinkedList<>();
 
@@ -109,7 +108,7 @@ public class Main {
 		String table = params.os("table");
 		String schema = params.os("schema");
 		String dir = params.ms("output-dir");
-		String driver = params.os("jdbc-driver", OracleDriver.class.getName());
+		String driver = params.ms("jdbc-driver");
 
 		if (null == table && null == schema) {
 			throw new IllegalArgumentException("At least one of table or schema is needed.");
@@ -234,7 +233,7 @@ public class Main {
 
 			String sql = table;
 			if (null != limit) {
-				if (driver.equalsIgnoreCase(OracleDriver.class.getName())) {
+				if (driver.endsWith("OracleDriver")) {
 					sql = "(select * from " + table + " where rownum < " + limit + ") src";
 				} else {
 					sql = "(select * from " + table + " limit " + limit + ") src";
@@ -244,7 +243,7 @@ public class Main {
 			// df.printSchema();
 			// log.debug("Table " + table + " : " + df.count() + " lignes.");
 
-			df.write().mode(SaveMode.Overwrite).orc(path);
+			df.write().mode(SaveMode.Overwrite).option("orc.compress", getCompression()).orc(path);
 			log.info("Table " + table + " exportée vers " + file.getAbsolutePath());
 		} else {
 			ss.read().orc(path).printSchema();
@@ -326,6 +325,14 @@ public class Main {
 
 	public void setTableBlackList(String tableBlackList) {
 		this.tableBlackList = Arrays.stream(tableBlackList.split(",")).collect(Collectors.toList());
+	}
+
+	public String getCompression() {
+		return compression;
+	}
+
+	public void setCompression(String compression) {
+		this.compression = compression;
 	}
 }
 
