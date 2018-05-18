@@ -49,11 +49,6 @@
 		<!-- <dependency> <groupId>org.scala-lang</groupId> <artifactId>scala-compiler</artifactId> 
 			<version>2.11.8</version> </dependency> -->
 		<dependency>
-			<groupId>com.oracle.jdbc</groupId>
-			<artifactId>ojdbc8</artifactId>
-			<version>12.2.0.1</version>
-		</dependency>
-		<dependency>
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
 			<version>6.0.5</version>
@@ -89,11 +84,6 @@
 			<version>2.2.4</version> </dependency> <dependency> <groupId>org.glassfish</groupId> 
 			<artifactId>javax.el</artifactId> <version>3.0.0</version> </dependency> -->
 
-		<dependency>
-			<groupId>com.ibm.netezza</groupId>
-			<artifactId>nzjdbc3-7.0.4</artifactId>
-			<version>1.0</version>
-		</dependency>
 	</dependencies>
 
 
