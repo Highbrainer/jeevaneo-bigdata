@@ -49,10 +49,13 @@ public class Main {
 	private boolean exportingTables = true;
 	private boolean exportingViews = false;
 	private boolean exportingSynonyms = false;
-	private String compression = "snappy"; //none, snappy, zlib
+	private String compression = "snappy"; // none, snappy, zlib
 
 	private List<String> tableBlackList = new LinkedList<>();
-	private List<String> schemaBlackList = new LinkedList<String>() {{add("information_schema");}};
+	private List<String> schemaBlackList = new LinkedList<>();
+	{
+		schemaBlackList.add("information_schema");
+	}
 
 	private String dir;
 
@@ -142,7 +145,7 @@ public class Main {
 		Set<String> tables = new TreeSet<>();
 		try (Connection con = connect();) {
 			DatabaseMetaData md = con.getMetaData();
-			
+
 			List<String> types = new ArrayList<>(3);
 			if (isExportingSynonyms()) {
 				types.add("SYNONYM");
@@ -154,14 +157,14 @@ public class Main {
 				types.add("VIEW");
 			}
 			String[] aTypes = types.toArray(new String[types.size()]);
-			
+
 			try (ResultSet rs = md.getTables(con.getCatalog(), null, "%", aTypes);) {
 				while (rs.next()) {
 					String name = rs.getString("TABLE_NAME");
 					String schem = rs.getString("TABLE_SCHEM");
 					log.debug(name);
 					if (!isSchemaBlackListed(name)) {
-						if(null!=schem && !schem.trim().isEmpty()) {
+						if (null != schem && !schem.trim().isEmpty()) {
 							name = schem + "." + name;
 						}
 						tables.add(name);
@@ -190,7 +193,7 @@ public class Main {
 				types.add("VIEW");
 			}
 			String[] aTypes = types.toArray(new String[types.size()]);
-			
+
 			try (ResultSet rs = md.getTables(null, schema, null, aTypes);) {
 				while (rs.next()) {
 					String tablename = rs.getString("TABLE_NAME");
@@ -240,9 +243,9 @@ public class Main {
 	}
 
 	private void exportAll(String schema) throws SQLException {
-		
+
 		configureParallelism();
-		
+
 		workInSpark(ss -> {
 			ForkJoinPool threadPool = new ForkJoinPool(getParallelism());
 			threadPool.submit(() -> {
@@ -263,10 +266,11 @@ public class Main {
 
 	private void configureParallelism() {
 		String threads = System.getProperty("java.util.concurrent.ForkJoinPool.common.parallelism", "-1");
-		if(Integer.parseInt(threads)<parallelism) {
-			System.setProperty("java.util.concurrent.ForkJoinPool.common.parallelism", ""+parallelism);
+		if (Integer.parseInt(threads) < parallelism) {
+			System.setProperty("java.util.concurrent.ForkJoinPool.common.parallelism", "" + parallelism);
 		}
 	}
+
 	private void exportAll() throws SQLException {
 		configureParallelism();
 		workInSpark(ss -> {
