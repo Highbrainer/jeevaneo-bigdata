@@ -7,7 +7,11 @@ The project in subfolder spark/misc/jdbc-to-orc is a simple demonstration of how
 
 Exemple use :
 
-### Downloading a single table from netezza, to local folder `/tmp/your/directory/here`:
+### Downloading a single table 
+
+This is done with parameters `--table=...` and `--output-dir=...` :
+
+Example downloading tbale `YOUR_TABLE_HERE` from netezza, to local folder `/tmp/your/directory/here`: 
 
  ```
  java -jar jdbc-to-orc-1.0.0-alpha.jar \
@@ -19,8 +23,9 @@ Exemple use :
  --table=YOUR_TABLE_HERE
  ```
  
-### Downloading all tables for a given schema from MS Sql Server:
+### Downloading all tables for a given schema
 
+Example downloading all tables from schema `YOUR_SCHEMA_HERE` in an SQLServer database
  ```
  java -jar jdbc-to-orc-1.0.0-alpha.jar \
  --jdbc-url=jdbc:microsoft:sqlserver://HOST:1433;DatabaseName=DATABASE \
@@ -31,7 +36,7 @@ Exemple use :
  --schema=YOUR_SCHEMA_HERE
  ``` 
  
-### Downloading all tables for a given schema from Oracle:
+Analog example from an Oracle DB:
  ```
  java -jar jdbc-to-orc-1.0.0-alpha.jar \
  --jdbc-url=jdbc:oracle:thin:@HOST:1521/SERVICENAME \
