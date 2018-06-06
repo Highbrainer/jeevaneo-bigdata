@@ -14,7 +14,7 @@ This is done with parameters `--table=...` and `--output-dir=...` :
 Example downloading tbale `YOUR_TABLE_HERE` from netezza, to local folder `/tmp/your/directory/here`: 
 
  ```
- java -jar jdbc-to-orc-1.0.0-alpha.jar \
+ java -jar jdbc-to-orc-1.0.0.jar \
  --jdbc-url=jdbc:netezza://HOST:PORT/SCHEMA \
  --jdbc-login=YOUR_DB_ACCOUNT \
  --jdbc-password=YOUR_PASSWORD_HERE \
@@ -27,7 +27,7 @@ Example downloading tbale `YOUR_TABLE_HERE` from netezza, to local folder `/tmp/
 
 Example downloading all tables from schema `YOUR_SCHEMA_HERE` in an SQLServer database
  ```
- java -jar jdbc-to-orc-1.0.0-alpha.jar \
+ java -jar jdbc-to-orc-1.0.0.jar \
  --jdbc-url=jdbc:microsoft:sqlserver://HOST:1433;DatabaseName=DATABASE \
  --jdbc-login=YOUR_DB_ACCOUNT \
  --jdbc-password=YOUR_PASSWORD_HERE \
@@ -38,7 +38,7 @@ Example downloading all tables from schema `YOUR_SCHEMA_HERE` in an SQLServer da
  
 Analog example from an Oracle DB:
  ```
- java -jar jdbc-to-orc-1.0.0-alpha.jar \
+ java -jar jdbc-to-orc-1.0.0.jar \
  --jdbc-url=jdbc:oracle:thin:@HOST:1521/SERVICENAME \
  --jdbc-login=YOUR_DB_ACCOUNT \
  --jdbc-password=YOUR_PASSWORD_HERE \
@@ -67,7 +67,7 @@ Analog example from an Oracle DB:
  The following command line will export every table from the schema named `YOUR_SCHEMA_HERE` except for tables `TABLE_I_DONT_WANT` and `OTHER_UNWANTED_TABLE` that will be ignored.
  
  ```
- java -jar jdbc-to-orc-1.0.0-alpha.jar \
+ java -jar jdbc-to-orc-1.0.0.jar \
  --jdbc-url=jdbc:oracle:thin:@HOST:1521/SERVICENAME \
  --jdbc-login=YOUR_DB_ACCOUNT \
  --jdbc-password=YOUR_PASSWORD_HERE \
@@ -81,7 +81,7 @@ Analog example from an Oracle DB:
  The following command line will export every table from the database (wether it is in a schema or not) except for tables in schema `SCHEMA_I_DONT_WANT` that will be ignored. 
  
  ```
- java -jar jdbc-to-orc-1.0.0-alpha.jar \
+ java -jar jdbc-to-orc-1.0.0.jar \
  --jdbc-url=jdbc:oracle:thin:@HOST:1521/SERVICENAME \
  --jdbc-login=YOUR_DB_ACCOUNT \
  --jdbc-password=YOUR_PASSWORD_HERE \
@@ -100,7 +100,7 @@ Analog example from an Oracle DB:
  
  Exemple:
   ```
- java -jar jdbc-to-orc-1.0.0-alpha.jar \
+ java -jar jdbc-to-orc-1.0.0.jar \
  --jdbc-url=jdbc:microsoft:sqlserver://HOST:1433;DatabaseName=DATABASE \
  --jdbc-login=YOUR_DB_ACCOUNT \
  --jdbc-password=YOUR_PASSWORD_HERE \
@@ -116,7 +116,7 @@ Analog example from an Oracle DB:
  
  Example : Export all tables from database except those with a tmp_ prefix :
    ```
- java -jar jdbc-to-orc-1.0.0-alpha.jar \
+ java -jar jdbc-to-orc-1.0.0.jar \
  --jdbc-url=jdbc:microsoft:sqlserver://HOST:1433;DatabaseName=DATABASE \
  --jdbc-login=YOUR_DB_ACCOUNT \
  --jdbc-password=YOUR_PASSWORD_HERE \
@@ -141,7 +141,7 @@ Analog example from an Oracle DB:
  
  Example : Export all tables and synonyms - but not views :
    ```
- java -jar jdbc-to-orc-1.0.0-alpha.jar \
+ java -jar jdbc-to-orc-1.0.0.jar \
  --jdbc-url=jdbc:microsoft:sqlserver://HOST:1433;DatabaseName=DATABASE \
  --jdbc-login=YOUR_DB_ACCOUNT \
  --jdbc-password=YOUR_PASSWORD_HERE \
