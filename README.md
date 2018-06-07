@@ -11,7 +11,7 @@ Exemple use :
 
 This is done with parameters `--table=...` and `--output-dir=...` :
 
-Example downloading tbale `YOUR_TABLE_HERE` from netezza, to local folder `/tmp/your/directory/here`: 
+Example downloading table `YOUR_TABLE_HERE` from netezza, to local folder `/tmp/your/directory/here`: 
 
  ```
  java -jar jdbc-to-orc-1.0.0.jar \
