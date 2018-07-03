@@ -8,7 +8,9 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.Driver;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,6 +36,12 @@ import com.jeevaneo.util.OS;
 public class Main {
 
 	private static Logger log = Logger.getLogger(Main.class);
+
+	private static String SQL_SERVER_QUOTING_CARACTER = "[%s]";
+
+	private static String ORACLE_QUOTING_CARACTER = "\"%s\"";
+
+	private static String MYSQL_QUOTING_CARACTER = "[%s]";
 
 	public Main() {
 	}
@@ -291,6 +299,19 @@ public class Main {
 		});
 	}
 
+	private String selectColumnQuotingPattern() {
+		if (driver.endsWith("oracle")) {
+			return ORACLE_QUOTING_CARACTER;
+		}
+		if (jdbcUrl.contains("sqlserver")) {
+			return SQL_SERVER_QUOTING_CARACTER;
+		}
+		if (jdbcUrl.contains("mysql")) {
+			return MYSQL_QUOTING_CARACTER;
+		}
+		return null;
+	}
+
 	private void exportTable(SparkSession ss, String table) {
 
 		log.info("Exporting " + table + "...");
@@ -308,15 +329,39 @@ public class Main {
 		if (isExporting()) {
 
 			String sql = table;
+			List<String> columnList = null;
+			String quotingPattern = selectColumnQuotingPattern();
+			try {
+				columnList = getColumnList(table);
+			} catch (SQLException e1) {
+				throw new RuntimeException(e1);
+			}
+			String columns = columnList.stream().map(c -> {
+				if (c.contains(" ")) {
+					return String.format(quotingPattern, c);
+				}
+				return c;
+			}).collect(Collectors.joining(","));
+
 			if (null != limit) {
 				if (driver.endsWith("OracleDriver")) {
-					sql = "(select * from " + table + " where rownum < " + limit + ") src";
+					sql = "(select " + columns + " from " + table + " where rownum < " + limit + ") src";
 				} else {
-					sql = "(select * from " + table + " limit " + limit + ") src";
+					sql = "(select " + columns + " from " + table + " limit " + limit + ") src";
 				}
+			} else {
+				sql = "(select " + columns + " from " + table + ") src";
 			}
+			log.debug("SQL: " + sql);
+
 			try {
 				Dataset<Row> df = ss.read().jdbc(jdbcUrl, sql /* , new String[] { "1=2" } */, props);
+				String[] columnsx = df.columns();
+				for (String c : columnsx) {
+					if (c.contains(" ")) {
+						df = df.withColumnRenamed(c, c.replace(" ", "_"));
+					}
+				}
 				df.write().mode(SaveMode.Overwrite).option("orc.compress", getCompression()).orc(path);
 				log.info("Table " + table + " exportée vers " + file.getAbsolutePath());
 			} catch (Throwable e) {
@@ -332,9 +377,27 @@ public class Main {
 
 	}
 
+	private List<String> getColumnList(String schemaAndTable) throws SQLException {
+		String schema = schemaAndTable.split("\\.")[0];
+		String table = schemaAndTable.split("\\.")[1];
+		List<String> columnList = new ArrayList<>();
+		try (Connection con = DriverManager.getConnection(jdbcUrl, jdbcLogin, jdbcPassword);
+				PreparedStatement ps = con.prepareStatement("select * from " + schema + "." + table + " where 1=2");
+				ResultSet rs = ps.executeQuery();) {
+			ResultSetMetaData metadata = rs.getMetaData();
+			int nb = metadata.getColumnCount();
+			for (int i = 0; i < nb; ++i) {
+				columnList.add(metadata.getColumnName(i + 1));
+			}
+		}
+		return columnList;
+	}
+
 	public void workInSpark(ConsumerWithSqlException<SparkSession> worker) throws SQLException {
 		log.info("Initializing spark...");
 		Builder builder = SparkSession.builder().config("mapreduce.app-submission.cross-platform", "true");
+
+		builder.config("hive.support.quoted.identifiers", "column");
 
 		builder.appName("appName");
 
