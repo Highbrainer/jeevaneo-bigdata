@@ -330,18 +330,14 @@ public class Main {
 
 			String sql = table;
 			List<String> columnList = null;
-			String quotingPattern = selectColumnQuotingPattern();
+
 			try {
 				columnList = getColumnList(table);
 			} catch (SQLException e1) {
-				throw new RuntimeException(e1);
+				throw new RuntimeException("Error during computing column list of table " + table, e1);
 			}
-			String columns = columnList.stream().map(c -> {
-				if (c.contains(" ")) {
-					return String.format(quotingPattern, c);
-				}
-				return c;
-			}).collect(Collectors.joining(","));
+
+			String columns = columnList.stream().collect(Collectors.joining(","));
 
 			if (null != limit) {
 				if (driver.endsWith("OracleDriver")) {
@@ -356,8 +352,8 @@ public class Main {
 
 			try {
 				Dataset<Row> df = ss.read().jdbc(jdbcUrl, sql /* , new String[] { "1=2" } */, props);
-				String[] columnsx = df.columns();
-				for (String c : columnsx) {
+				String[] columns_ = df.columns();
+				for (String c : columns_) {
 					if (c.contains(" ")) {
 						df = df.withColumnRenamed(c, c.replace(" ", "_"));
 					}
@@ -366,6 +362,7 @@ public class Main {
 				log.info("Table " + table + " exportée vers " + file.getAbsolutePath());
 			} catch (Throwable e) {
 				e.printStackTrace();
+				throw new RuntimeException("Error when writing data of table " + table, e);
 			}
 			// df.printSchema();
 			// log.debug("Table " + table + " : " + df.count() + " lignes.");
@@ -378,6 +375,7 @@ public class Main {
 	}
 
 	private List<String> getColumnList(String schemaAndTable) throws SQLException {
+		String quotingPattern = selectColumnQuotingPattern();
 		String schema = schemaAndTable.split("\\.")[0];
 		String table = schemaAndTable.split("\\.")[1];
 		List<String> columnList = new ArrayList<>();
@@ -387,7 +385,8 @@ public class Main {
 			ResultSetMetaData metadata = rs.getMetaData();
 			int nb = metadata.getColumnCount();
 			for (int i = 0; i < nb; ++i) {
-				columnList.add(metadata.getColumnName(i + 1));
+				String c = metadata.getColumnName(i + 1);
+				columnList.add(String.format(quotingPattern, c));
 			}
 		}
 		return columnList;
