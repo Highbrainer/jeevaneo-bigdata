@@ -204,7 +204,7 @@ public class Main {
 
 			try (ResultSet rs = md.getTables(null, schema, null, aTypes);) {
 				while (rs.next()) {
-					String tablename = rs.getString("TABLE_NAME");
+					String tablename = schema + "." + rs.getString("TABLE_NAME");
 					log.debug(tablename);
 					if (!isTableBlackListed(tablename)) {
 						tables.add(tablename);
