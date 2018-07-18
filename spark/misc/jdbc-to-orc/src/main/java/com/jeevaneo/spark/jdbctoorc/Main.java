@@ -29,6 +29,9 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.SparkSession.Builder;
+import org.apache.spark.sql.functions;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
 
 import com.jeevaneo.util.Args;
 import com.jeevaneo.util.OS;
@@ -58,6 +61,7 @@ public class Main {
 	private boolean exportingViews = false;
 	private boolean exportingSynonyms = false;
 	private String compression = "snappy"; // none, snappy, zlib
+	private String lineBreakReplaceString = "";
 
 	private List<String> tableBlackList = new LinkedList<>();
 	private List<String> schemaBlackList = new LinkedList<>();
@@ -352,12 +356,22 @@ public class Main {
 
 			try {
 				Dataset<Row> df = ss.read().jdbc(jdbcUrl, sql /* , new String[] { "1=2" } */, props);
-				String[] columns_ = df.columns();
-				for (String c : columns_) {
-					if (c.contains(" ")) {
-						df = df.withColumnRenamed(c, c.replace(" ", "_"));
+				List<StructField> fields = Arrays.stream(df.schema().fields()).collect(Collectors.toList());
+				for (StructField f : fields) {
+					String colName = f.name();
+					if (colName.contains(" ")) {
+						df = df.withColumnRenamed(colName, colName.replace(" ", "_"));
+					}
+					if (getLineBreakReplaceString() != null) {
+						if (f.dataType().equals(DataTypes.StringType)) {
+							String auxColName = colName + "_";
+							log.info("Replacing line break characters by '" + getLineBreakReplaceString() + "' into column " + colName);
+							df = df.withColumn(auxColName, functions.regexp_replace(df.col(colName), "\r?\n\\s*", getLineBreakReplaceString()))
+									.drop(colName).withColumnRenamed(auxColName, colName);
+						}
 					}
 				}
+
 				df.write().mode(SaveMode.Overwrite).option("orc.compress", getCompression()).orc(path);
 				log.info("Table " + table + " exportée vers " + file.getAbsolutePath());
 			} catch (Throwable e) {
@@ -484,6 +498,15 @@ public class Main {
 	public void setCompression(String compression) {
 		this.compression = compression;
 	}
+
+	public String getLineBreakReplaceString() {
+		return lineBreakReplaceString;
+	}
+
+	public void setLineBreakReplaceString(String lineBreakReplaceString) {
+		this.lineBreakReplaceString = lineBreakReplaceString;
+	}
+
 }
 
 @FunctionalInterface
